@@ -1,5 +1,5 @@
 from schema import QAschema
-import agent_state as agent
+import llm as agent
 
 def userInput(state: QAschema):
     x = input("Ask question >> ")

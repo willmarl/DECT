@@ -6,8 +6,7 @@ builder = StateGraph(QAschema)
 builder.add_node("userInput", userInput)
 builder.add_node("aiResponse", aiResponse)
 
-builder.add_edge(START, "userInput")
-builder.add_edge("userInput", "aiResponse")
+builder.add_edge(START, "aiResponse")
 builder.add_edge("aiResponse", END)
 
 graph = builder.compile()
