@@ -1,0 +1,7 @@
+{
+  "name": "Run Gradio with Hot Reload",
+  "type": "python",
+  "request": "launch",
+  "module": "uvicorn",
+  "args": ["app:app", "--reload", "--port", "7860"]
+}
