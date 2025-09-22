@@ -1,3 +1,7 @@
+"""
+The reason why transforming PDF to images is to get higher accuracy in text extraction.
+When sending to LLM, images yield better results than raw PDFs.
+"""
 from pdf2image import convert_from_bytes, convert_from_path
 from pathlib import Path
 import os
