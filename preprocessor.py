@@ -29,7 +29,7 @@ def pdf_to_images(pdf_bytes):
     fileList = []
     # get list of filenames
     for file in pdf_bytes:
-        fileList.append(os.path.basename(file.name))
+        fileList.append(os.path.splitext(os.path.basename(file.name))[0])
 
     # save images to respective folders
     for i, fileName in enumerate(fileList):
