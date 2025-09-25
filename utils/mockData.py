@@ -13,3 +13,42 @@ def gen_csv():
     return df
 
 dummyData = gen_csv()
+
+fakeJson = {
+    "FRs": [
+        {
+            "id": "FR-001",
+            "description": "The system shall allow users to create an account using their email address and a password.",
+            "priority": "High",
+            "acceptance_criteria": [
+                "Users can register with a valid email and password.",
+                "An account confirmation email is sent upon registration."
+            ]
+        },
+        {
+            "id": "FR-002",
+            "description": "The system shall allow users to log in using their registered email and password.",
+            "priority": "High",
+            "acceptance_criteria": [
+                "Users can log in with correct credentials.",
+                "An error message is displayed for incorrect credentials."
+            ]
+        }
+    ]
+}
+
+from types import SimpleNamespace
+fakeResponse = SimpleNamespace(
+    id="chatcmpl-9hTzEXAMPLE123",
+    object="chat.completion",
+    choices=[
+        SimpleNamespace(
+            index=0,
+            message=SimpleNamespace(
+                role="assistant",
+                content='{\n  "user": "alex",\n  "age": 23\n}'
+            ),
+            finish_reason="stop"
+        )
+    ]
+)

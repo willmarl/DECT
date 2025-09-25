@@ -42,6 +42,8 @@ def pdf_to_images(pdf_bytes):
             img.save(f"pdf2img/{fileName}/{j+1}.png", "PNG")
 
     if len(fileList) > 0:
+        from preprocessor.extractFR import extractFRfromImage
+        extractFRfromImage()
         return True
     else:
         return False

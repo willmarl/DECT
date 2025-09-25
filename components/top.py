@@ -2,7 +2,7 @@ import gradio as gr
 import pandas as pd
 from io import StringIO
 from utils.mockData import dummyData
-from preprocessor import pdf_to_images
+from preprocessor.pdf2img import pdf_to_images
 from time import sleep
 
 def isButtonValid(x):
@@ -13,6 +13,7 @@ def isButtonValid(x):
 
 def updateRunButton(success):
     """Convert boolean output from pdf_to_images to button state"""
+    # update select task to pull from extractFR
     status = "✅ PDF processed successfully! Ready to run analysis." if success else "❌ PDF processing failed"
     return gr.update(interactive=success), status
 
@@ -34,11 +35,15 @@ dummyTasks = ["Task 1", "Task 2", "Task 3"]
 def top():
     gr.Markdown("# DECT | Don't Enjoy Creating Tests")
     with gr.Row():
+        #########################
         # Left Column File Upload
+        #########################
         with gr.Column():
             uploadFile = gr.File(label="Upload your file here", file_count="multiple", file_types=[".pdf"])
         
+        #########################
         # Middle Column Buttons and Dropdown
+        #########################
         with gr.Column():
             # Status display for user feedback
             statusText = gr.Textbox(
@@ -81,7 +86,9 @@ def top():
                 outputs=processPdfButton
             )
 
+        #########################
         # Right Column Result Snippet
+        #########################
         with gr.Column():
             resultSnippet = gr.Dataframe(value=dummyData, label="Result Snippet")
 
