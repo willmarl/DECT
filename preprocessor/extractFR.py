@@ -6,18 +6,18 @@ import json
 from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()
-import prompts
+from prompts import EXTRACTED_FR
 LLM_MODEL = str(os.getenv("OPENAI_MODEL"))
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # System prompt for consistency
-SYSTEM_PROMPT = prompts.SYSTEM_PROMPT
+SYSTEM_PROMPT = EXTRACTED_FR["system_prompt"]
 
 # Template for user prompt
-USER_PROMPT = prompts.EXTRACT_FR
+USER_PROMPT = EXTRACTED_FR["user_prompt"]
 
 
 def extractFRfromImage():
-    prompt = prompts.EXTRACT_FR
+    prompt = USER_PROMPT
     filePathInput = "pdf2img"
 
     # base system + text prompt
