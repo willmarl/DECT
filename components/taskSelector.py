@@ -137,6 +137,49 @@ class TaskSelector:
                     break
                     
         return selected_data
+    
+    def create_tasks_json(self, all_files_data, output_dir="start", filename="tasks.json"):
+        """Create a JSON file with all selected tasks organized by file name"""
+        import os
+        
+        # Create the start directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Build the JSON structure
+        tasks_json = {}
+        
+        for file_name, selected_requirements in all_files_data.items():
+            if selected_requirements:
+                # Get the original data
+                data = self.json_files.get(file_name, {})
+                requirements = data.get('requirements', [])
+                
+                # Create an array for this file's requirements
+                file_requirements = []
+                
+                for selected in selected_requirements:
+                    # Extract the ID from the formatted string
+                    req_id = selected.split(':')[0]
+                    
+                    # Find the full requirement data
+                    for req in requirements:
+                        if req.get('id') == req_id:
+                            # Create the requirement object with ID as key
+                            file_requirements.append({
+                                req_id: req.get('text', 'No description')
+                            })
+                            break
+                
+                # Add to the main JSON structure if we have requirements
+                if file_requirements:
+                    tasks_json[file_name] = file_requirements
+        
+        # Write to file
+        output_path = os.path.join(output_dir, filename)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(tasks_json, f, indent=4, ensure_ascii=False)
+        
+        return output_path, len(tasks_json), sum(len(reqs) for reqs in tasks_json.values())
 
 def create_task_selector():
     """Create and return the task selector component"""
@@ -211,6 +254,21 @@ def create_task_selector():
         output_text = selector.format_all_selected_requirements(all_selections)
         
         return str(has_selections), output_text
+    
+    def get_all_selections():
+        """Get all current selections"""
+        return all_selections.copy()
+    
+    def create_tasks_json_file():
+        """Create the tasks.json file with all selected tasks"""
+        try:
+            if not any(selections for selections in all_selections.values()):
+                return "❌ No tasks selected. Please select at least one task before running.", False
+            
+            output_path, num_files, num_tasks = selector.create_tasks_json(all_selections)
+            return f"✅ Tasks JSON created successfully!\n\nFile: {output_path}\nFiles processed: {num_files}\nTotal tasks: {num_tasks}", True
+        except Exception as e:
+            return f"❌ Error creating tasks JSON: {str(e)}", False
     
     # Check initial state
     is_empty = selector.is_directory_empty()
@@ -318,7 +376,9 @@ def create_task_selector():
         'selection_status': selection_status,
         'selected_tasks_output': selected_tasks_output,
         'title_markdown': title_markdown,
-        'selector_instance': selector
+        'selector_instance': selector,
+        'get_all_selections': get_all_selections,
+        'create_tasks_json_file': create_tasks_json_file
     }
 
 # For standalone testing

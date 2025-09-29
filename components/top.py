@@ -19,9 +19,22 @@ def long_running_task():
     sleep(1.5) # Simulate a long process
     return True
 
-def updateDownloadButton():
+def updateDownloadButton(create_tasks_json_func):
+    """Create tasks JSON and then simulate analysis"""
+    # First create the tasks JSON file
+    json_result, json_success = create_tasks_json_func()
+    
+    if not json_success:
+        return gr.update(interactive=False), json_result
+    
+    # Simulate the analysis process
     x = long_running_task()
-    status = "✅ Analysis complete! Results ready for download." if x else "❌ Analysis failed"
+    
+    if x:
+        status = f"{json_result}\n\n✅ Analysis complete! Results ready for download."
+    else:
+        status = f"{json_result}\n\n❌ Analysis failed"
+    
     return gr.update(interactive=x), status
 
 def checkTaskSelection(selection_status):
@@ -68,8 +81,12 @@ def top():
             task_selector = create_task_selector()
     
     # Event handlers with improved progress coverage and status updates
+    def run_analysis():
+        """Run the analysis with task JSON creation"""
+        return updateDownloadButton(task_selector['create_tasks_json_file'])
+    
     runButton.click(
-        fn=updateDownloadButton, 
+        fn=run_analysis, 
         inputs=None, 
         outputs=[downloadButton, statusText], 
         show_progress="full",

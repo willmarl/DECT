@@ -1,0 +1,12 @@
+{
+    "example copy": [
+        {
+            "FR-2": "Only Latin letters. The name must be 2-25 characters. If the user doesn't comply with one or more of these requirements, the field box will be highlighted in red, and the 'Invalid entry' error message will appear underneath."
+        }
+    ],
+    "example": [
+        {
+            "FR-4": "Only numbers and the + sign. The phone number must be 10-12 characters. Character entry starts in brackets after the + sign."
+        }
+    ]
+}
