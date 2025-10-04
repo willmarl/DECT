@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 class TaskSelector:
-    def __init__(self, json_directory="extractedFR"):
+    def __init__(self, json_directory="data/extractedFR"):
         self.json_directory = json_directory
         self.json_files = {}
         self.load_json_files()
@@ -138,7 +138,7 @@ class TaskSelector:
                     
         return selected_data
     
-    def create_tasks_json(self, all_files_data, output_dir="start", filename="tasks.json"):
+    def create_tasks_json(self, all_files_data, output_dir="data", filename="selected_tasks.json"):
         """Create a JSON file with all selected tasks organized by file name"""
         import os
         

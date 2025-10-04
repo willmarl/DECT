@@ -6,8 +6,10 @@ from pdf2image import convert_from_bytes, convert_from_path
 from pathlib import Path
 import os
 
+input_folder_name = "inputs"
+
 def fresh_pdf_folders():
-    p = Path("pdf2img")
+    p = Path(input_folder_name)
     if p.exists():
         for folder in p.iterdir():
             for file in folder.iterdir():
@@ -17,7 +19,7 @@ def fresh_pdf_folders():
         p.mkdir()
 
 def make_folder(folder_name):
-    p = Path(f"pdf2img/{folder_name}")
+    p = Path(f"{input_folder_name}/{folder_name}")
     p.mkdir()
 
 def pdf_to_images(pdf_bytes):
@@ -39,10 +41,10 @@ def pdf_to_images(pdf_bytes):
             file_bytes = file.read()
         images = convert_from_bytes(file_bytes, dpi=300)
         for j, img in enumerate(images):
-            img.save(f"pdf2img/{fileName}/{j+1}.png", "PNG")
+            img.save(f"{input_folder_name}/{fileName}/{j+1}.png", "PNG")
 
     if len(fileList) > 0:
-        from preprocessor.extractFR import extractFRfromImage
+        from utils.extractFR import extractFRfromImage
         extractFRfromImage()
         return True
     else:

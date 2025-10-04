@@ -54,8 +54,8 @@ flowchart TD
 
     subgraph LangGraph Pipeline
         direction LR
-        S1[Step 1: Atomic Blocks] --> S2[Step 2: Partitions] 
-        S2 --> S3[Step 3: Boundaries] 
+        S1[Step 1: Atomic Blocks] --> S2[Step 2: Partitions]
+        S2 --> S3[Step 3: Boundaries]
         S3 --> S4[Step 4: Test Values]
         S4 --> S5[Step 5: Unified List]
         S5 --> S6[Step 6: Deduped List]
@@ -96,7 +96,7 @@ flowchart TD
 
 ## 🔹 Current State
 
-- [ ] PDF preprocessing script
+- [x] PDF preprocessing script
 - [ ] LangGraph pipeline (steps 1–8)
 - [ ] File outputs by FR/step
 - [ ] Example test cases for FR-1
@@ -107,3 +107,4 @@ flowchart TD
 
 - [ ] Jira integration (auto-create tickets)
 - [ ] HITL review nodes
+- [ ] Retry generating starting from specific steps

@@ -2,7 +2,7 @@ import gradio as gr
 import pandas as pd
 from io import StringIO
 from utils.mockData import dummyData
-from preprocessor.pdf2img import pdf_to_images
+from utils.pdf2img import pdf_to_images
 from components.taskSelector import create_task_selector
 from time import sleep
 
@@ -15,32 +15,65 @@ def isButtonValid(x):
 # Note: updateRunButton and processPdfAndUpdateButton functions have been replaced 
 # with the inline process_pdf_and_refresh function in the top() function
 
-def long_running_task():
-    sleep(1.5) # Simulate a long process
-    return True
+def run_pipeline_analysis():
+    """Run the actual pipeline analysis using simple_run.py"""
+    import subprocess
+    import sys
+    from pathlib import Path
+    
+    try:
+        # Run the pipeline
+        result = subprocess.run([
+            sys.executable, "-m", "core.simple_run"
+        ], capture_output=True, text=True, cwd=Path.cwd())
+        
+        if result.returncode == 0:
+            return True, f"✅ Pipeline completed successfully!\n\nOutput:\n{result.stdout}"
+        else:
+            return False, f"❌ Pipeline failed with error:\n{result.stderr}"
+    except Exception as e:
+        return False, f"❌ Error running pipeline: {str(e)}"
 
 def updateDownloadButton(create_tasks_json_func):
-    """Create tasks JSON and then simulate analysis"""
+    """Create tasks JSON and then run the actual analysis pipeline"""
     # First create the tasks JSON file
     json_result, json_success = create_tasks_json_func()
     
     if not json_success:
         return gr.update(interactive=False), json_result
     
-    # Simulate the analysis process
-    x = long_running_task()
+    # Run the actual pipeline analysis
+    pipeline_success, pipeline_status = run_pipeline_analysis()
     
-    if x:
-        status = f"{json_result}\n\n✅ Analysis complete! Results ready for download."
+    if pipeline_success:
+        status = f"{json_result}\n\n{pipeline_status}\n\n📥 Results ready for download!"
     else:
-        status = f"{json_result}\n\n❌ Analysis failed"
+        status = f"{json_result}\n\n{pipeline_status}"
     
-    return gr.update(interactive=x), status
+    return gr.update(interactive=pipeline_success), status
 
 def checkTaskSelection(selection_status):
     """Check if tasks are selected to enable/disable run button"""
     is_selected = selection_status == "True"
     return gr.update(interactive=is_selected)
+
+def prepare_download():
+    """Prepare the final output JSON file for download"""
+    from pathlib import Path
+    
+    # Ensure outputs directory exists
+    outputs_dir = Path("outputs")
+    outputs_dir.mkdir(exist_ok=True)
+    
+    final_output_path = outputs_dir / "final_output.json"
+    
+    if final_output_path.exists():
+        return gr.update(value=str(final_output_path), visible=True)
+    else:
+        # If file doesn't exist, create a temporary error file
+        error_file = outputs_dir / "error.txt"
+        error_file.write_text("Error: final_output.json not found. Please run the analysis first.")
+        return gr.update(value=str(error_file), visible=True)
 
 def top():
     gr.Markdown("# DECT | Don't Enjoy Creating Tests")
@@ -64,6 +97,7 @@ def top():
             )
             
             downloadButton = gr.Button("Download Results", interactive=False)
+            downloadFile = gr.File(visible=False)
 
             with gr.Row():
                 processPdfButton = gr.Button("1. Process PDF", interactive=False)
@@ -163,6 +197,13 @@ def top():
         fn=isButtonValid, 
         inputs=uploadFile, 
         outputs=processPdfButton
+    )
+    
+    # Connect download button to prepare download file
+    downloadButton.click(
+        fn=prepare_download,
+        inputs=None,
+        outputs=[downloadFile]
     )
 
     gr.Markdown("---")

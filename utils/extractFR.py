@@ -6,7 +6,7 @@ import json
 from openai import OpenAI
 from dotenv import load_dotenv
 load_dotenv()
-from prompts import EXTRACTED_FR
+from utils.prompts import EXTRACTED_FR
 LLM_MODEL = str(os.getenv("OPENAI_MODEL"))
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # System prompt for consistency
@@ -18,7 +18,7 @@ USER_PROMPT = EXTRACTED_FR["user_prompt"]
 
 def extractFRfromImage():
     prompt = USER_PROMPT
-    filePathInput = "pdf2img"
+    filePathInput = "inputs"
 
     # base system + text prompt
     base_messages: list[dict] = [
@@ -57,11 +57,11 @@ def extractFRfromImage():
 
         response = ask_gpt(messages)
 
-        raw_json = response.choices[0].message.content
+        raw_json = response.choices[0].message.content # type: ignore
         jsonOutput = json.loads(raw_json)  # type: ignore
 
         fileName = f"{pdfFolder.stem}.json"
-        outputDir = Path("extractedFR")
+        outputDir = Path("data/extractedFR")
         outputDir.mkdir(parents=True, exist_ok=True)
         outputPath = outputDir / fileName
 
@@ -70,8 +70,9 @@ def extractFRfromImage():
 
         print(f"Wrote output to {outputPath}")
 
-
+from utils.mockData import fakeResponse2
 def ask_gpt(messages):
+    return fakeResponse2 # for testing without API calls
     return client.chat.completions.create(
         model=LLM_MODEL,
         messages=messages,
