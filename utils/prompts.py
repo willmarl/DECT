@@ -1,39 +1,35 @@
+import json
 import utils.schema as s
+
+# Helper to escape braces so ChatPromptTemplate doesn't treat JSON braces as template vars
+def _esc_obj(obj: object) -> str:
+        # Dump JSON then escape braces by doubling them
+        return json.dumps(obj, indent=2).replace("{", "{{").replace("}", "}}")
+
+def _esc_str(text: str) -> str:
+        # Escape existing braces in a raw example string
+        return text.replace("{", "{{").replace("}", "}}")
+
 EXTRACTED_FR = {
-    "system_prompt":"""You are a QA assistant.
+        "system_prompt":"""You are a QA assistant.
 Your job is to transform functional requirements into QA artifacts step by step.
 Never add commentary.""",
-    "user_prompt": """Extract all Functional Requirements (FRs) visible in this image
+        "user_prompt": """Extract all Functional Requirements (FRs) visible in this image
 and return them in the following JSON format:
 
 {
-  "requirements": [
-    {
-      "id": "FR-1",
-      "text": "..."
-    }
-  ]
+    "requirements": [
+        {
+            "id": "FR-1",
+            "text": "..."
+        }
+    ]
 }
 
 Extract the FR information and return it strictly as JSON.
 Do not include any other text, explanations, or formatting.
 """
 }
-
-# Example usage
-# from utils import prompts
-#
-# response = client.chat.completions.create(
-#     model="gpt-5-turbo",
-#     messages=[
-#         {"role": "system", "content": prompts.STEP1["system_prompt"]},
-#         {"role": "user", "content": prompts.STEP1["user_prompt"].format(requirement_text=req_text)}
-#     ]
-# )
-
-
-# prompts.py
-import utils.schema as s
 
 # Step 1: Atomic Blocks
 STEP1 = {
@@ -42,15 +38,12 @@ into the smallest independent, testable units called atomic blocks. Each atomic 
 exactly one verifiable condition or behavior from the requirement.
 
 Use the following schema and example for formatting your response:
-{s.step1_schema}
+{_esc_obj(s.step1_schema)}
 Use the following example as a guide:
-{s.step1_example}
+{_esc_str(s.step1_example)}
 """,
     "user_prompt": """Break down the following requirement into atomic blocks.
 Return only valid JSON following the schema and example provided.
-
-Requirement:
-{requirement_text}
 """
 }
 
@@ -60,9 +53,9 @@ STEP2 = {
 For every atomic block, identify valid and invalid input categories.
 
 Use the following schema and example for formatting your response:
-{s.step2_schema}
+{_esc_obj(s.step2_schema)}
 Use the following example as a guide:
-{s.step2_example}
+{_esc_str(s.step2_example)}
 """,
     "user_prompt": """Using the atomic blocks from Step 1, identify valid and invalid partitions.
 Return only JSON following the schema and example.
@@ -78,9 +71,9 @@ STEP3 = {
 atomic blocks. Identify invalid, boundary, and valid examples for each block.
 
 Use the following schema and example for formatting your response:
-{s.step3_schema}
+{_esc_obj(s.step3_schema)}
 Use the following example as a guide:
-{s.step3_example}
+{_esc_str(s.step3_example)}
 """,
     "user_prompt": """Using the partitions from Step 2, define boundary cases for each applicable atomic block.
 Return only JSON following the schema and example.
@@ -96,9 +89,9 @@ STEP4 = {
 Generate realistic example inputs for every category.
 
 Use the following schema and example for formatting your response:
-{s.step4_schema}
+{_esc_obj(s.step4_schema)}
 Use the following example as a guide:
-{s.step4_example}
+{_esc_str(s.step4_example)}
 """,
     "user_prompt": """Using partitions and boundary cases, produce test values for each atomic block.
 Return only JSON following the schema and example.
@@ -116,9 +109,9 @@ STEP5 = {
 Flatten all test values from previous steps into a single unified list of inputs.
 
 Use the following schema and example for formatting your response:
-{s.step5_schema}
+{_esc_obj(s.step5_schema)}
 Use the following example as a guide:
-{s.step5_example}
+{_esc_str(s.step5_example)}
 """,
     "user_prompt": """Combine all test values from previous steps into a unified list.
 Return only JSON following the schema and example.
@@ -134,9 +127,9 @@ STEP6 = {
 Remove duplicates while preserving logical diversity of test cases.
 
 Use the following schema and example for formatting your response:
-{s.step6_schema}
+{_esc_obj(s.step6_schema)}
 Use the following example as a guide:
-{s.step6_example}
+{_esc_str(s.step6_example)}
 """,
     "user_prompt": """Remove duplicate test values and output a cleaned list.
 Return only JSON following the schema and example.
@@ -152,9 +145,9 @@ STEP7 = {
 test case generation. Group values by feature, equivalence class, and boundaries.
 
 Use the following schema and example for formatting your response:
-{s.step7_schema}
+{_esc_obj(s.step7_schema)}
 Use the following example as a guide:
-{s.step7_example}
+{_esc_str(s.step7_example)}
 """,
     "user_prompt": """Organize the deduped test values into equivalence classes and boundary groupings.
 Return only JSON following the schema and example.
@@ -170,9 +163,9 @@ STEP8 = {
 Each test case must include title, precondition, steps, data, and expected result.
 
 Use the following schema and example for formatting your response:
-{s.step8_schema}
+{_esc_obj(s.step8_schema)}
 Use the following example as a guide:
-{s.step8_example}
+{_esc_str(s.step8_example)}
 """,
     "user_prompt": """Generate detailed test cases using the organized test data.
 Return only JSON following the schema and example.

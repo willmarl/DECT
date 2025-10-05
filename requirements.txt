@@ -2,5 +2,5 @@ gradio
 python-dotenv
 langchain-openai
 langchain-ollama
-langgraph
+langchain-anthropic
 rich
