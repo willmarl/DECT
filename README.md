@@ -3,6 +3,10 @@
 DECT is a QA automation project that takes functional requirements (PDFs)
 and generates test artifacts step by step using LangChain + LangGraph.
 
+![DECT_complete](./screenshots/5_complete.jpg)
+
+- [screenshots.md](./screenshots/screenshots.md) - visual overview of the app with embedded screenshots
+
 ---
 
 ## 🔹 Goal of the Project
