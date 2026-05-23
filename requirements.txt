@@ -4,3 +4,4 @@ langchain-openai
 langchain-ollama
 langchain-anthropic
 rich
+pdf2image
