@@ -210,8 +210,17 @@ def combine_all_step8_files():
     else:
         print(f"CSV export failed: {csv_message}")
 
+    from core.status import set_app_status
+
     write_pipeline_status(
         f"Final results ready! Generated test cases from {len(step8_files)} FRs"
+    )
+    set_app_status(
+        "idle",
+        "Results ready for download",
+        f"Combined {len(step8_files)} FR(s) into outputs/final_output.json + CSV",
+        active=False,
+        simple="📥 Results ready for download",
     )
     return final_output_path
 

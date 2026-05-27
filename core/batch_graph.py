@@ -58,6 +58,15 @@ def run_batch_pipeline(pdf_name: str, frs_list: list[dict[str, str]]) -> None:
         fr_id = list(fr.keys())[0]
         set_fr_status(pdf_name, fr_id, 0, "running", "Queued")
 
+    from core.status import set_app_status
+
+    set_app_status(
+        "pipeline",
+        f"Starting test pipeline for {pdf_name}",
+        f"{len(frs_list)} FR(s) — running in parallel (see MAX_PARALLEL_FRS)",
+        active=True,
+        simple=f"🚀 Starting pipeline — {len(frs_list)} FR(s)",
+    )
     write_pipeline_status(
         f"Starting analysis of {pdf_name} with {len(frs_list)} FRs (parallel)"
     )
@@ -70,6 +79,14 @@ def run_batch_pipeline(pdf_name: str, frs_list: list[dict[str, str]]) -> None:
     })
 
     print(f"\n=== Completed parallel pipeline for {pdf_name} ===")
+    from core.status import set_app_status
+
+    set_app_status(
+        "pipeline",
+        f"Pipeline finished for {pdf_name}",
+        f"Processed {len(frs_list)} FR(s) — combining results next",
+        active=True,
+    )
     write_pipeline_status(
         f"Analysis complete! Processed {len(frs_list)} FRs for {pdf_name}"
     )

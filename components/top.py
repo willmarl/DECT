@@ -1,7 +1,6 @@
 import gradio as gr
 import pandas as pd
 from io import StringIO
-from utils.pdf2img import pdf_to_images
 from components.taskSelector import create_task_selector
 from time import sleep
 import json
@@ -118,82 +117,14 @@ def load_final_output_as_dataframe(limit_rows=None, truncate_for_snippet=False):
             'Test Status (Pass / Fail)', 'Jira Bug Link'
         ])
 
-def monitor_pipeline_status():
-    """Monitor pipeline progress via per-FR status files and step logbook."""
-    from core.status import get_batch_status, read_fr_status
+def get_status_outputs():
+    """Return (simple_markdown, detail_log) for the status UI."""
+    from core.status import get_status_ui
+    return get_status_ui()
 
-    status_file = Path("pipeline_status.txt")
-    try:
-        if status_file.exists():
-            summary = status_file.read_text(encoding="utf-8").strip()
-            if summary:
-                return summary
-    except OSError:
-        pass
 
-    logbook_base = Path("data/pdf_logbook")
-    if not logbook_base.exists():
-        return "Ready to process PDFs"
-
-    for pdf_dir in sorted(logbook_base.iterdir()):
-        if not pdf_dir.is_dir() or pdf_dir.name.startswith("."):
-            continue
-
-        fr_ids = [
-            fr_dir.name
-            for fr_dir in pdf_dir.iterdir()
-            if fr_dir.is_dir()
-            and fr_dir.name.startswith("FR-")
-            and not fr_dir.name.startswith(".")
-        ]
-        if not fr_ids:
-            continue
-
-        batch_msg = get_batch_status(pdf_dir.name, fr_ids)
-        if batch_msg:
-            return f"{pdf_dir.name}: {batch_msg}"
-
-        statuses = [read_fr_status(pdf_dir.name, fr_id) for fr_id in fr_ids]
-        statuses = [s for s in statuses if s]
-        if statuses:
-            done = sum(1 for s in statuses if s.get("phase") == "done")
-            running = next((s for s in statuses if s.get("phase") == "running"), None)
-            if done == len(statuses):
-                return f"Pipeline completed! All {done} FRs done ({pdf_dir.name})"
-            if running:
-                return (
-                    f"Processing {pdf_dir.name}: {running.get('fr_id')} "
-                    f"step {running.get('step', '?')}/8 | {done}/{len(statuses)} FRs done"
-                )
-
-    latest_step = 0
-    total_frs = 0
-    completed_frs = 0
-
-    for pdf_dir in logbook_base.iterdir():
-        if not pdf_dir.is_dir():
-            continue
-        for fr_dir in pdf_dir.iterdir():
-            if fr_dir.is_dir() and fr_dir.name.startswith("FR-"):
-                total_frs += 1
-                fr_latest_step = 0
-                for step in range(1, 9):
-                    if (fr_dir / f"step{step}.json").exists():
-                        fr_latest_step = step
-                if fr_latest_step == 8:
-                    completed_frs += 1
-                latest_step = max(latest_step, fr_latest_step)
-
-    if total_frs > 0:
-        if completed_frs == total_frs:
-            return f"Pipeline completed! All {total_frs} FRs processed through all 8 steps."
-        return f"Processing step {latest_step}/8 | Completed FRs: {completed_frs}/{total_frs}"
-
-    return "Ready to process PDFs"
-
-def get_current_pipeline_status():
-    """Get the current pipeline status for display"""
-    return monitor_pipeline_status()
+STATUS_READY_SIMPLE = "✅ Ready — upload a PDF to begin"
+STATUS_READY_LOG = "No activity yet."
 
 def isButtonValid(x):
     if x is not None and len(x) > 0:
@@ -201,68 +132,81 @@ def isButtonValid(x):
     else:
         return gr.update(interactive=False)
 
+
+def on_files_uploaded(files):
+    """Enable Process PDF and show a simple received message (not processing yet)."""
+    from core.status import clear_app_status, note_files_uploaded
+    import os
+
+    btn = isButtonValid(files)
+    if not files:
+        clear_app_status()
+        return btn, STATUS_READY_SIMPLE, STATUS_READY_LOG
+    names = [os.path.basename(f.name) for f in files]
+    note_files_uploaded(names)
+    simple, detail = get_status_outputs()
+    return btn, simple, detail
+
 # Note: updateRunButton and processPdfAndUpdateButton functions have been replaced 
 # with the inline process_pdf_and_refresh function in the top() function
 
-def run_pipeline_analysis():
-    """Run the actual pipeline analysis using simple_run.py"""
+def _start_pipeline_subprocess():
+    """Start pipeline subprocess; caller must poll and call _finish_pipeline_subprocess."""
     import sys
-    from pathlib import Path
-    
-    # Write initial status
-    status_file = Path("pipeline_status.txt")
-    status_file.write_text("🚀 Starting pipeline analysis...")
-    
-    try:
-        # Start the pipeline process
-        process = subprocess.Popen([
-            sys.executable, "-m", "core.simple_run"
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=Path.cwd())
-        
-        # Track the process globally
-        current_process["process"] = process
-        current_process["type"] = "pipeline"
-        
-        # Wait for completion
-        stdout, stderr = process.communicate()
-        
-        # Clear the process tracking
-        current_process["process"] = None
-        current_process["type"] = None
-        
-        if process.returncode == 0:
-            status_file.write_text("✅ Pipeline completed successfully!")
-            return True, f"✅ Pipeline completed successfully!\n\nOutput:\n{stdout}"
-        elif process.returncode == -signal.SIGTERM or process.returncode == -signal.SIGKILL:
-            status_file.write_text("🛑 Pipeline stopped by user")
-            return False, "🛑 Pipeline analysis was stopped by user"
-        else:
-            status_file.write_text("❌ Pipeline failed with error")
-            return False, f"❌ Pipeline failed with error:\n{stderr}"
-    except Exception as e:
-        # Clear the process tracking on error
-        current_process["process"] = None
-        current_process["type"] = None
-        status_file.write_text(f"❌ Error running pipeline: {str(e)}")
-        return False, f"❌ Error running pipeline: {str(e)}"
+    from core.status import set_app_status, append_status_log
 
-def updateDownloadButton(create_tasks_json_func):
-    """Create tasks JSON and then run the actual analysis pipeline"""
-    # First create the tasks JSON file
-    json_result, json_success = create_tasks_json_func()
-    
-    if not json_success:
-        return gr.update(interactive=False), json_result
-    
-    # Run the actual pipeline analysis
-    pipeline_success, pipeline_status = run_pipeline_analysis()
-    
-    if pipeline_success:
-        status = f"{json_result}\n\n{pipeline_status}\n\n📥 Results ready for download!"
-    else:
-        status = f"{json_result}\n\n{pipeline_status}"
-    
-    return gr.update(interactive=pipeline_success), status
+    set_app_status(
+        "pipeline",
+        "Starting test pipeline",
+        "Launching core.simple_run (8 steps per FR, parallel across FRs)",
+        active=True,
+        simple="🚀 Starting test pipeline…",
+    )
+    append_status_log("Subprocess: python -m core.simple_run")
+
+    process = subprocess.Popen(
+        [sys.executable, "-m", "core.simple_run"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        cwd=Path.cwd(),
+    )
+    current_process["process"] = process
+    current_process["type"] = "pipeline"
+    return process
+
+
+def _finish_pipeline_subprocess(process):
+    """Wait for pipeline process and return (success, status_message)."""
+    from core.status import set_app_status, get_status_ui
+
+    stdout, stderr = process.communicate()
+    current_process["process"] = None
+    current_process["type"] = None
+
+    if process.returncode == 0:
+        set_app_status(
+            "idle",
+            "Pipeline completed successfully",
+            "See results below",
+            active=False,
+            simple="📥 Results ready for download",
+        )
+        simple, _detail = get_status_ui()
+        return True, f"{simple}\n\n📥 Download JSON + CSV below."
+    if process.returncode in (-signal.SIGTERM, -signal.SIGKILL):
+        set_app_status(
+            "idle", "Pipeline stopped", "Stopped by user", active=False, simple="🛑 Stopped"
+        )
+        return False, "🛑 Pipeline analysis was stopped by user"
+    set_app_status(
+        "error",
+        "Pipeline failed",
+        stderr[:500] if stderr else "Unknown error",
+        active=False,
+        simple="❌ Pipeline failed",
+    )
+    return False, f"❌ Pipeline failed:\n{stderr}"
 
 def checkTaskSelection(selection_status):
     """Check if tasks are selected to enable/disable run button"""
@@ -355,11 +299,17 @@ def stop_current_process():
             # Clear the process tracking
             current_process.clear()
             
-            # Update status
-            status_file = Path("pipeline_status.txt")
-            status_file.write_text(f"🛑 {process_type.capitalize()} process stopped by user")
-            
-            return f"🛑 {process_type.capitalize()} process stopped successfully"
+            from core.status import set_app_status, append_status_log
+
+            append_status_log(f"{process_type.capitalize()} process stopped by user")
+            set_app_status(
+                "idle",
+                "Stopped by user",
+                "",
+                active=False,
+                simple="🛑 Stopped",
+            )
+            return "🛑 Stopped"
         except Exception as e:
             return f"⚠️ Error stopping process: {str(e)}"
     else:
@@ -410,13 +360,15 @@ def top():
         # Middle Column Buttons
         #########################
         with gr.Column():
-            # Status display for user feedback
-            statusText = gr.Textbox(
-                label="Status", 
-                value="Ready to process PDFs", 
-                interactive=False,
-                lines=2
-            )
+            statusSimple = gr.Markdown(value=STATUS_READY_SIMPLE)
+            with gr.Accordion("Detailed log", open=False):
+                statusLog = gr.Textbox(
+                    label="Activity log",
+                    value=STATUS_READY_LOG,
+                    interactive=False,
+                    lines=12,
+                    max_lines=24,
+                )
             
             downloadButton = gr.Button("📥 Download Results (JSON + CSV)", interactive=False)
             downloadFile = gr.File(visible=False)
@@ -448,100 +400,216 @@ def top():
     
     # Function to handle pre-analysis setup (enable stop button)
     def start_analysis():
-        """Prepare for analysis and enable stop button"""
-        # Enable stop button, disable run button temporarily
-        return (
-            gr.update(interactive=False),  # Disable runButton
-            gr.update(interactive=True),   # Enable stopButton
-            "🚀 Starting pipeline analysis..."  # Update status
+        """Prepare for analysis and enable stop button."""
+        from core.status import set_app_status, get_status_ui
+
+        set_app_status(
+            "pipeline",
+            "Preparing analysis",
+            "Saving selected tasks...",
+            active=True,
+            simple="🚀 Preparing analysis…",
         )
-    
-    # Function to handle analysis completion
+        simple, detail = get_status_ui()
+        return (
+            gr.update(interactive=False),
+            gr.update(interactive=True),
+            simple,
+            detail,
+        )
+
     def complete_analysis():
-        """Run the actual analysis"""
-        # Update status to show pipeline is starting
-        status_update = "🚀 Starting pipeline analysis..."
-        
-        # Create tasks and run pipeline
-        download_state, final_status = updateDownloadButton(task_selector['create_tasks_json_file'])
-        
-        # Load updated results
-        updated_snippet = load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True)
-        
-        # Re-enable run button, disable stop button
-        run_button_state = gr.update(interactive=True)
-        stop_button_state = gr.update(interactive=False)
-        
-        return download_state, final_status, updated_snippet, run_button_state, stop_button_state
-    
+        """Create tasks JSON, run pipeline subprocess, yield status while running."""
+        from core.status import set_app_status, get_status_ui
+
+        json_result, json_success = task_selector["create_tasks_json_file"]()
+        snippet = load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True)
+
+        if not json_success:
+            yield (
+                gr.update(interactive=False),
+                json_result,
+                STATUS_READY_LOG,
+                snippet,
+                gr.update(interactive=True),
+                gr.update(interactive=False),
+            )
+            return
+
+        set_app_status(
+            "pipeline",
+            "Task list saved",
+            json_result[:200],
+            active=True,
+            simple="🚀 Starting test pipeline…",
+        )
+        simple, detail = get_status_ui()
+        yield (
+            gr.update(interactive=False),
+            simple,
+            detail,
+            snippet,
+            gr.update(interactive=False),
+            gr.update(interactive=True),
+        )
+
+        try:
+            process = _start_pipeline_subprocess()
+        except Exception as e:
+            set_app_status(
+                "error",
+                "Failed to start pipeline",
+                str(e),
+                active=False,
+                simple="❌ Failed to start pipeline",
+            )
+            simple, detail = get_status_ui()
+            yield (
+                gr.update(interactive=False),
+                simple,
+                detail,
+                snippet,
+                gr.update(interactive=True),
+                gr.update(interactive=False),
+            )
+            return
+
+        while process.poll() is None:
+            time.sleep(1.0)
+            simple, detail = get_status_ui()
+            yield (
+                gr.update(interactive=False),
+                simple,
+                detail,
+                load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True),
+                gr.update(interactive=False),
+                gr.update(interactive=True),
+            )
+
+        success, final_status = _finish_pipeline_subprocess(process)
+        snippet = load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True)
+        _, detail = get_status_ui()
+        yield (
+            gr.update(interactive=success),
+            final_status,
+            detail,
+            snippet,
+            gr.update(interactive=True),
+            gr.update(interactive=False),
+        )
+
     runButton.click(
         fn=start_analysis,
         inputs=None,
-        outputs=[runButton, stopButton, statusText]
+        outputs=[runButton, stopButton, statusSimple, statusLog],
     ).then(
         fn=complete_analysis,
         inputs=None,
-        outputs=[downloadButton, statusText, resultSnippet, runButton, stopButton],
+        outputs=[downloadButton, statusSimple, statusLog, resultSnippet, runButton, stopButton],
         show_progress="full",
-        show_progress_on=[downloadButton, processPdfButton, resultSnippet]
+        show_progress_on=[statusSimple, statusLog, processPdfButton, runButton],
     )
-    
-    # Connect PDF processing to enable/disable Run button based on success
+
+    def _task_selector_unchanged():
+        return (
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(),
+        )
+
     def process_pdf_and_refresh(pdf_files):
-        """Process PDF and automatically refresh task selector"""
-        success = pdf_to_images(pdf_files)
-        status = "✅ PDF processed successfully! Select tasks below and then run analysis." if success else "❌ PDF processing failed"
-        
-        if success:
-            # Refresh task selector files
-            task_selector['selector_instance'].load_json_files()
-            has_files = task_selector['selector_instance'].has_files()
-            file_options = task_selector['selector_instance'].get_file_options()
-            initial_file = file_options[0] if file_options else None
-            
-            # Get initial requirements
-            initial_requirements = []
-            if initial_file:
-                initial_requirements, _ = task_selector['selector_instance'].get_requirements_for_file(initial_file)
-            
-            # Determine output message and title
-            if not has_files:
-                output_message = "📂 No processed PDFs found.\n\nPlease upload and process a PDF first using the '1. Process PDF' button above."
-                title_text = "### 📋 Task Selector ⚠️ (Disabled - No PDFs Processed)"
-            else:
-                output_message = "No tasks selected"
-                title_text = "### 📋 Task Selector"
-            
-            return [
-                gr.update(interactive=False),  # Keep run button disabled until tasks selected
-                status,
-                gr.update(choices=file_options, value=initial_file, interactive=has_files),  # Update file dropdown
-                gr.update(choices=initial_requirements, value=[], interactive=has_files),   # Update requirements
-                output_message,  # Update output textbox
-                gr.update(interactive=has_files),  # Refresh button
-                gr.update(interactive=has_files),  # Select all button
-                gr.update(interactive=has_files),  # Deselect all button
-                gr.update(value=title_text),  # Update title
-            ]
+        """Process PDF with live status updates in the status textbox."""
+        from core.status import get_status_ui, set_app_status
+        from utils.pdf2img import pdf_to_images_with_progress
+
+        run_btn = gr.update(interactive=False)
+        unchanged = _task_selector_unchanged()
+
+        if not pdf_files:
+            set_app_status(
+                "error",
+                "No files selected",
+                "Upload a PDF first",
+                active=False,
+                simple="❌ No files selected",
+            )
+            simple, detail = get_status_ui()
+            yield run_btn, simple, detail, *unchanged
+            return
+
+        success = False
+        for simple, detail, done in pdf_to_images_with_progress(pdf_files):
+            yield run_btn, simple, detail, *unchanged
+            success = done
+
+        if not success:
+            set_app_status(
+                "error",
+                "PDF processing failed",
+                "Check terminal logs",
+                active=False,
+                simple="❌ PDF processing failed",
+            )
+            simple, detail = get_status_ui()
+            yield run_btn, simple, detail, *unchanged
+            return
+
+        task_selector["selector_instance"].load_json_files()
+        has_files = task_selector["selector_instance"].has_files()
+        file_options = task_selector["selector_instance"].get_file_options()
+        initial_file = file_options[0] if file_options else None
+
+        initial_requirements = []
+        if initial_file:
+            initial_requirements, _ = (
+                task_selector["selector_instance"].get_requirements_for_file(initial_file)
+            )
+
+        if not has_files:
+            output_message = (
+                "📂 No processed PDFs found.\n\n"
+                "Please upload and process a PDF first using the '1. Process PDF' button above."
+            )
+            title_text = "### 📋 Task Selector ⚠️ (Disabled - No PDFs Processed)"
         else:
-            return [
-                gr.update(interactive=False),
-                status,
-                gr.update(),  # No change to dropdown
-                gr.update(),  # No change to requirements
-                gr.update(),  # No change to output
-                gr.update(),  # No change to refresh button
-                gr.update(),  # No change to select all button
-                gr.update(),  # No change to deselect all button
-                gr.update(),  # No change to title
-            ]
-    
+            output_message = "No tasks selected"
+            title_text = "### 📋 Task Selector"
+
+        simple, detail = get_status_ui()
+        yield (
+            gr.update(interactive=False),
+            simple,
+            detail,
+            gr.update(choices=file_options, value=initial_file, interactive=has_files),
+            gr.update(choices=initial_requirements, value=[], interactive=has_files),
+            output_message,
+            gr.update(interactive=has_files),
+            gr.update(interactive=has_files),
+            gr.update(interactive=has_files),
+            gr.update(value=title_text),
+        )
+
     processPdfButton.click(
-        fn=process_pdf_and_refresh, 
-        inputs=[uploadFile], 
-        outputs=[runButton, statusText, task_selector['file_dropdown'], task_selector['requirements_selector'], task_selector['selected_tasks_output'], task_selector['refresh_btn'], task_selector['select_all_btn'], task_selector['deselect_all_btn'], task_selector['title_markdown']], 
-        show_progress="full", 
-        show_progress_on=[downloadButton, processPdfButton, runButton]
+        fn=process_pdf_and_refresh,
+        inputs=[uploadFile],
+        outputs=[
+            runButton,
+            statusSimple,
+            statusLog,
+            task_selector["file_dropdown"],
+            task_selector["requirements_selector"],
+            task_selector["selected_tasks_output"],
+            task_selector["refresh_btn"],
+            task_selector["select_all_btn"],
+            task_selector["deselect_all_btn"],
+            task_selector["title_markdown"],
+        ],
+        show_progress="full",
+        show_progress_on=[statusSimple, statusLog, processPdfButton],
     )
     
     # Connect task selection to run button state
@@ -551,11 +619,10 @@ def top():
         outputs=[runButton]
     )
     
-    # Connect the file upload change event to update the button state
     uploadFile.change(
-        fn=isButtonValid, 
-        inputs=uploadFile, 
-        outputs=processPdfButton
+        fn=on_files_uploaded,
+        inputs=uploadFile,
+        outputs=[processPdfButton, statusSimple, statusLog],
     )
     
     # Connect download button to prepare download file
@@ -565,18 +632,26 @@ def top():
         outputs=[downloadFile]
     )
     
-    # Add periodic status and result updates (every 3 seconds when pipeline is running)
     def refresh_status_and_results():
-        """Refresh status and results periodically"""
-        current_status = get_current_pipeline_status()
-        updated_results = load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True)
-        return current_status, updated_results
-    
-    # Connect refresh button functionality
+        """Refresh status and results (manual button + timer)."""
+        simple, detail = get_status_outputs()
+        return (
+            simple,
+            detail,
+            load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True),
+        )
+
     refreshButton.click(
         fn=refresh_status_and_results,
         inputs=None,
-        outputs=[statusText, resultSnippet]
+        outputs=[statusSimple, statusLog, resultSnippet],
+    )
+
+    status_timer = gr.Timer(value=2)
+    status_timer.tick(
+        fn=refresh_status_and_results,
+        inputs=None,
+        outputs=[statusSimple, statusLog, resultSnippet],
     )
     
     # Clear button functionality - resets everything to initial state
@@ -589,17 +664,19 @@ def top():
         has_files = task_selector['selector_instance'].has_files()
         file_options = task_selector['selector_instance'].get_file_options()
         
-        # Stop any running processes
         if current_process.get("process"):
             stop_current_process()
-        
-        # Reset to initial state
+
+        from core.status import clear_app_status
+        clear_app_status()
+
         return [
             None,  # Clear uploadFile
             gr.update(interactive=False),  # Disable processPdfButton
             gr.update(interactive=False),  # Disable runButton
             gr.update(interactive=False),  # Disable downloadButton
-            f"{clear_status}\n\nReady to process PDFs",  # Reset statusText
+            STATUS_READY_SIMPLE,
+            STATUS_READY_LOG,
             pd.DataFrame(columns=[  # Reset resultSnippet to empty table
                 'FR ID', 'Test Case', 'Precondition', 'Steps', 'Test Data', 
                 'Expected Result', 'Environment', 'Actual Result', 
@@ -617,16 +694,18 @@ def top():
         stop_message = stop_current_process()
         
         # Re-enable run button, disable stop button
+        simple, detail = get_status_outputs()
         return (
-            gr.update(interactive=True),   # Enable runButton
-            gr.update(interactive=False),  # Disable stopButton
-            stop_message  # Update statusText
+            gr.update(interactive=True),
+            gr.update(interactive=False),
+            simple if "🛑" in stop_message or "⚠️" in stop_message else stop_message,
+            detail,
         )
-    
+
     stopButton.click(
         fn=handle_stop,
         inputs=None,
-        outputs=[runButton, stopButton, statusText]
+        outputs=[runButton, stopButton, statusSimple, statusLog],
     )
     
     clearButton.click(
@@ -637,7 +716,8 @@ def top():
             processPdfButton, 
             runButton,
             downloadButton,
-            statusText, 
+            statusSimple,
+            statusLog,
             resultSnippet,
             task_selector['file_dropdown'],
             task_selector['requirements_selector'],

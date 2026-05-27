@@ -49,10 +49,14 @@ def invoke_step(
     fr_text: str,
 ) -> dict:
     """Run one pipeline step via LLM and return parsed JSON."""
+    from core.status import append_status_log
+
+    append_status_log(f"LLM step {step_number}: preparing prompt")
     print(f"  Preparing prompt for step {step_number}...")
     start_time = time.time()
 
     with _llm_semaphore:
+        append_status_log(f"LLM step {step_number}: waiting for API slot")
         llm = get_llm()
 
         if step_number == 1:
@@ -74,9 +78,11 @@ def invoke_step(
             ])
 
         chain = prompt | llm | JsonOutputParser()
+        append_status_log(f"LLM step {step_number}: calling model")
         print(f"  Invoking LLM for step {step_number}...")
         result = chain.invoke({})
 
     elapsed = time.time() - start_time
+    append_status_log(f"LLM step {step_number}: done ({elapsed:.1f}s)")
     print(f"  Step {step_number} LLM call completed in {elapsed:.1f}s")
     return result
