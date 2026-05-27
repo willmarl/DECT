@@ -119,49 +119,77 @@ def load_final_output_as_dataframe(limit_rows=None, truncate_for_snippet=False):
         ])
 
 def monitor_pipeline_status():
-    """Monitor pipeline progress by checking step files"""
+    """Monitor pipeline progress via per-FR status files and step logbook."""
+    from core.status import get_batch_status, read_fr_status
+
     status_file = Path("pipeline_status.txt")
-    
-    while True:
-        try:
-            if status_file.exists():
-                with open(status_file, 'r') as f:
-                    status = f.read().strip()
-                    return status
-        except:
-            pass
-        
-        # Check for step files as fallback
-        logbook_base = Path("data/pdf_logbook")
-        if logbook_base.exists():
-            latest_step = 0
-            total_frs = 0
-            completed_frs = 0
-            
-            for pdf_dir in logbook_base.iterdir():
-                if pdf_dir.is_dir():
-                    for fr_dir in pdf_dir.iterdir():
-                        if fr_dir.is_dir() and fr_dir.name.startswith('FR-'):
-                            total_frs += 1
-                            fr_latest_step = 0
-                            
-                            for step in range(1, 9):
-                                step_file = fr_dir / f"step{step}.json"
-                                if step_file.exists():
-                                    fr_latest_step = step
-                            
-                            if fr_latest_step == 8:
-                                completed_frs += 1
-                            
-                            latest_step = max(latest_step, fr_latest_step)
-            
-            if total_frs > 0:
-                if completed_frs == total_frs:
-                    return f"✅ Pipeline completed! All {total_frs} FRs processed through all 8 steps."
-                else:
-                    return f"🔄 Processing step {latest_step}/8 | Completed FRs: {completed_frs}/{total_frs}"
-        
+    try:
+        if status_file.exists():
+            summary = status_file.read_text(encoding="utf-8").strip()
+            if summary:
+                return summary
+    except OSError:
+        pass
+
+    logbook_base = Path("data/pdf_logbook")
+    if not logbook_base.exists():
         return "Ready to process PDFs"
+
+    for pdf_dir in sorted(logbook_base.iterdir()):
+        if not pdf_dir.is_dir() or pdf_dir.name.startswith("."):
+            continue
+
+        fr_ids = [
+            fr_dir.name
+            for fr_dir in pdf_dir.iterdir()
+            if fr_dir.is_dir()
+            and fr_dir.name.startswith("FR-")
+            and not fr_dir.name.startswith(".")
+        ]
+        if not fr_ids:
+            continue
+
+        batch_msg = get_batch_status(pdf_dir.name, fr_ids)
+        if batch_msg:
+            return f"{pdf_dir.name}: {batch_msg}"
+
+        statuses = [read_fr_status(pdf_dir.name, fr_id) for fr_id in fr_ids]
+        statuses = [s for s in statuses if s]
+        if statuses:
+            done = sum(1 for s in statuses if s.get("phase") == "done")
+            running = next((s for s in statuses if s.get("phase") == "running"), None)
+            if done == len(statuses):
+                return f"Pipeline completed! All {done} FRs done ({pdf_dir.name})"
+            if running:
+                return (
+                    f"Processing {pdf_dir.name}: {running.get('fr_id')} "
+                    f"step {running.get('step', '?')}/8 | {done}/{len(statuses)} FRs done"
+                )
+
+    latest_step = 0
+    total_frs = 0
+    completed_frs = 0
+
+    for pdf_dir in logbook_base.iterdir():
+        if not pdf_dir.is_dir():
+            continue
+        for fr_dir in pdf_dir.iterdir():
+            if fr_dir.is_dir() and fr_dir.name.startswith("FR-"):
+                total_frs += 1
+                fr_latest_step = 0
+                for step in range(1, 9):
+                    if (fr_dir / f"step{step}.json").exists():
+                        fr_latest_step = step
+                if fr_latest_step == 8:
+                    completed_frs += 1
+                latest_step = max(latest_step, fr_latest_step)
+
+    if total_frs > 0:
+        if completed_frs == total_frs:
+            return f"Pipeline completed! All {total_frs} FRs processed through all 8 steps."
+        return f"Processing step {latest_step}/8 | Completed FRs: {completed_frs}/{total_frs}"
+
+    return "Ready to process PDFs"
 
 def get_current_pipeline_status():
     """Get the current pipeline status for display"""

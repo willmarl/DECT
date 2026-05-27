@@ -63,7 +63,7 @@ flowchart TB
         n16["Pipeline<br>Steps 1 - 8"]
         n17["Concatenate all completed FRs"]
         n3["(multimodal image captioning has better accuracy than OCR)"]
-        n10@{ label: "Note: currently doesn't do parallel task/batch processing.<br>Right now it only does one FR at a time &gt;.&lt;" }
+        n10@{ label: "Note: FRs run in parallel (MAX_PARALLEL_FRS); steps 1-8 stay sequential per FR." }
   end
  subgraph s3["Pipeline"]
         n20["Step 1: Atomic Blocks<br>data/pdf_logbook/foo_pdf/step1.json"]
@@ -177,7 +177,12 @@ flowchart TB
 
 - Python 3.13+
 - [LangChain](https://python.langchain.com/)
+- [LangGraph](https://langchain-ai.github.io/langgraph/) — sequential 8-step graph per FR; parallel batch across FRs via `Send`
 - [Gradio](https://www.gradio.app/) — simple local UI for running steps
+
+### Parallel FR processing
+
+Set `MAX_PARALLEL_FRS` in `.env` (default `3`). Each FR runs steps 1→8 in order; multiple FRs run at once up to that cap (LLM calls share a semaphore).
 
 ---
 
@@ -190,14 +195,14 @@ flowchart TB
   - [x] OpenAI
   - [ ] Ollama
   - [ ] Anthropic
-- [ ] Better UX showing processing status
+- [x] Parallel FR processing (`MAX_PARALLEL_FRS`, LangGraph `Send`)
+- [ ] Better UX showing processing status (live stream)
 
 ---
 
 ## 🔹 Features that be cool to add
 
 - [ ] Stream steps/output and have webui update live
-- [ ] Parallel FR processing
 - [ ] Jira integration (auto-create tickets)
 - [ ] HITL review nodes
 - [ ] Retry generating starting from specific steps

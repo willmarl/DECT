@@ -18,3 +18,6 @@ IMAGE_MODEL = os.getenv("IMAGE_MODEL", "")
 OPENAI_API_KEY = SecretStr(os.getenv("OPENAI_API_KEY", ""))
 ANTHROPIC_API_KEY = SecretStr(os.getenv("ANTHROPIC_API_KEY", ""))
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "")
+
+# Max concurrent LLM calls when processing multiple FRs in parallel
+MAX_PARALLEL_FRS = max(1, int(os.getenv("MAX_PARALLEL_FRS", "3")))
