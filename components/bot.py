@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import pandas as pd
 
+from components.ui_styles import RESULTS_COLUMN_WIDTHS_FULL
+
 def load_full_final_output():
     """Load the complete final_output.json and convert to DataFrame"""
     final_output_path = Path("outputs/final_output.json")
@@ -72,10 +74,12 @@ def get_summary_stats():
         total_test_cases = sum(len(suite.get('test_cases', [])) for suite in data.get('test_suite', []))
         document_id = data.get('document_id', 'Unknown Document')
         
-        return f"📊 **Analysis Results for {document_id}**\n\n" + \
-               f"• **Total Functional Requirements:** {total_frs}\n" + \
-               f"• **Total Test Cases Generated:** {total_test_cases}\n" + \
-               f"• **Average Test Cases per FR:** {total_test_cases/total_frs if total_frs > 0 else 0:.1f}"
+        avg = total_test_cases / total_frs if total_frs > 0 else 0.0
+        return (
+            f"📊 **{document_id}** — "
+            f"{total_frs} FR(s), {total_test_cases} test case(s), "
+            f"{avg:.1f} avg per FR"
+        )
                
     except Exception as e:
         return f"Error loading summary: {e}"
@@ -83,7 +87,7 @@ def get_summary_stats():
 def bot():
     from config import UI_POLL_INTERVAL_SEC
 
-    gr.Markdown("## Final Compiled Test Cases")
+    gr.Markdown("### Final compiled test cases")
     
     # Summary statistics
     summary = gr.Markdown(get_summary_stats())
@@ -91,9 +95,11 @@ def bot():
     # Full results dataframe
     full_results = gr.Dataframe(
         value=load_full_final_output(),
-        label="Complete Test Cases", 
+        label="Complete Test Cases",
         wrap=True,
-        interactive=False
+        column_widths=RESULTS_COLUMN_WIDTHS_FULL,
+        interactive=False,
+        elem_classes=["dect-df", "dect-df-full"],
     )
     
     def poll_results():

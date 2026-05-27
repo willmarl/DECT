@@ -2,6 +2,7 @@ import gradio as gr
 import pandas as pd
 from io import StringIO
 from components.taskSelector import create_task_selector
+from components.ui_styles import RESULTS_COLUMN_WIDTHS
 from time import sleep
 import json
 from pathlib import Path
@@ -354,7 +355,7 @@ def top():
     # Header row with title and clear button
     with gr.Row():
         with gr.Column(scale=8):
-            gr.Markdown("# DECT | Don't Enjoy Creating Tests")
+            gr.Markdown("## DECT | Don't Enjoy Creating Tests")
         with gr.Column(scale=2):
             clearButton = gr.Button("🗑️ Clear All", variant="stop", size="sm")
     
@@ -404,9 +405,11 @@ def top():
         #########################
         with gr.Column():
             resultSnippet = gr.Dataframe(
-                value=load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True), 
+                value=load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True),
                 label="Result Snippet (First 5 test cases)",
-                wrap=True
+                wrap=True,
+                column_widths=RESULTS_COLUMN_WIDTHS,
+                elem_classes=["dect-df"],
             )
     
     # Task Selector in its own row below the three columns
@@ -605,10 +608,10 @@ def top():
                 "📂 No processed PDFs found.\n\n"
                 "Please upload and process a PDF first using the '1. Process PDF' button above."
             )
-            title_text = "### 📋 Task Selector ⚠️ (Disabled - No PDFs Processed)"
+            title_text = "📋 Task selector ⚠️ (no PDFs processed yet)"
         else:
             output_message = "No tasks selected"
-            title_text = "### 📋 Task Selector"
+            title_text = "📋 Task selector"
 
         simple, detail = get_status_ui()
         yield (
@@ -724,7 +727,7 @@ def top():
             gr.update(choices=file_options, value=None, interactive=has_files),  # Reset file_dropdown
             gr.update(choices=[], value=[], interactive=has_files),  # Reset requirements_selector
             "No tasks selected" if has_files else "📂 No processed PDFs found.\n\nPlease upload and process a PDF first using the '1. Process PDF' button above.",  # Reset selected_tasks_output
-            "### 📋 Task Selector" if has_files else "### 📋 Task Selector ⚠️ (Disabled - No PDFs Processed)",  # Reset title_markdown
+            "📋 Task selector" if has_files else "📋 Task selector ⚠️ (no PDFs processed yet)",
         ]
     
     # Stop button functionality

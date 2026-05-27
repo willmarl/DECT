@@ -223,11 +223,11 @@ def create_task_selector():
         preserved = [r for r in preserved if r in requirements]
 
         if is_empty:
-            title_text = "### 📋 Task Selector ⚠️ (Disabled - No PDFs Processed)"
+            title_text = "📋 Task selector ⚠️ (no PDFs processed yet)"
         elif not has_files:
-            title_text = "### 📋 Task Selector ⚠️ (Disabled - No Valid Files)"
+            title_text = "📋 Task selector ⚠️ (no valid files)"
         else:
-            title_text = "### 📋 Task Selector"
+            title_text = "📋 Task selector"
 
         output_message = selector.format_all_selected_requirements(all_selections)
         if is_empty:
@@ -301,11 +301,11 @@ def create_task_selector():
     
     # Dynamic title based on state
     if is_empty:
-        title_text = "### 📋 Task Selector ⚠️ (Disabled - No PDFs Processed)"
+        title_text = "📋 Task selector ⚠️ (no PDFs processed yet)"
     elif not has_files:
-        title_text = "### 📋 Task Selector ⚠️ (Disabled - No Valid Files)"
+        title_text = "📋 Task selector ⚠️ (no valid files)"
     else:
-        title_text = "### 📋 Task Selector"
+        title_text = "📋 Task selector"
     
     title_markdown = gr.Markdown(title_text)
     

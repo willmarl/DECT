@@ -4,7 +4,10 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-css = "text-align: center; margin-top: 20px;"
+SECTION_TITLE_STYLE = (
+    "text-align: center; margin: 0.25rem 0; "
+    "font-size: 1.05rem; font-weight: 600; line-height: 1.3;"
+)
 
 def get_available_frs() -> List[str]:
     """Get list of available FR IDs from the pipeline logbook"""
@@ -187,11 +190,7 @@ def mid():
         )
         
         gr.Markdown(
-            f"""
-            <h2 style="{css}">
-                Pipeline Step Viewer
-            </h2>
-            """
+            f'<p style="{SECTION_TITLE_STYLE}">Pipeline step viewer</p>',
         )
         
     # FR Summary
@@ -203,7 +202,8 @@ def mid():
             step1_df = gr.Dataframe(
                 value=load_step_data(initial_fr, 1)[0],
                 label="Atomic Blocks - Breaking down requirements into testable units",
-                wrap=True
+                wrap=True,
+                elem_classes=["dect-df"],
             )
             step1_status = gr.Markdown(load_step_data(initial_fr, 1)[1])
             
@@ -211,7 +211,8 @@ def mid():
             step2_df = gr.Dataframe(
                 value=load_step_data(initial_fr, 2)[0],
                 label="Equivalence Partitions - Valid and invalid input categories",
-                wrap=True
+                wrap=True,
+                elem_classes=["dect-df"],
             )
             step2_status = gr.Markdown(load_step_data(initial_fr, 2)[1])
             
@@ -219,7 +220,8 @@ def mid():
             step3_df = gr.Dataframe(
                 value=load_step_data(initial_fr, 3)[0],
                 label="Boundary Values - Edge cases and limits",
-                wrap=True
+                wrap=True,
+                elem_classes=["dect-df"],
             )
             step3_status = gr.Markdown(load_step_data(initial_fr, 3)[1])
             
@@ -227,7 +229,8 @@ def mid():
             step4_df = gr.Dataframe(
                 value=load_step_data(initial_fr, 4)[0],
                 label="Test Values - Concrete examples for each partition",
-                wrap=True
+                wrap=True,
+                elem_classes=["dect-df"],
             )
             step4_status = gr.Markdown(load_step_data(initial_fr, 4)[1])
             
@@ -235,7 +238,8 @@ def mid():
             step5_df = gr.Dataframe(
                 value=load_step_data(initial_fr, 5)[0],
                 label="Unified List - Combined test values",
-                wrap=True
+                wrap=True,
+                elem_classes=["dect-df"],
             )
             step5_status = gr.Markdown(load_step_data(initial_fr, 5)[1])
             
@@ -243,7 +247,8 @@ def mid():
             step6_df = gr.Dataframe(
                 value=load_step_data(initial_fr, 6)[0],
                 label="Deduped List - Cleaned test values",
-                wrap=True
+                wrap=True,
+                elem_classes=["dect-df"],
             )
             step6_status = gr.Markdown(load_step_data(initial_fr, 6)[1])
             
@@ -251,7 +256,8 @@ def mid():
             step7_df = gr.Dataframe(
                 value=load_step_data(initial_fr, 7)[0],
                 label="Organized Data - Structured test groups",
-                wrap=True
+                wrap=True,
+                elem_classes=["dect-df"],
             )
             step7_status = gr.Markdown(load_step_data(initial_fr, 7)[1])
             
@@ -259,7 +265,8 @@ def mid():
             step8_df = gr.Dataframe(
                 value=load_step_data(initial_fr, 8)[0],
                 label="Final Test Cases - Complete test specifications",
-                wrap=True
+                wrap=True,
+                elem_classes=["dect-df"],
             )
             step8_status = gr.Markdown(load_step_data(initial_fr, 8)[1])
     
