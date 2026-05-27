@@ -150,19 +150,25 @@ def on_files_uploaded(files):
 # Note: updateRunButton and processPdfAndUpdateButton functions have been replaced 
 # with the inline process_pdf_and_refresh function in the top() function
 
-def _start_pipeline_subprocess():
+def _start_pipeline_subprocess(max_parallel: int):
     """Start pipeline subprocess; caller must poll and call _finish_pipeline_subprocess."""
     import sys
+    from core.concurrency import set_max_parallel_frs
     from core.status import set_app_status, append_status_log
 
+    parallel = set_max_parallel_frs(max_parallel)
     set_app_status(
         "pipeline",
         "Starting test pipeline",
-        "Launching core.simple_run (8 steps per FR, parallel across FRs)",
+        f"Up to {parallel} FR(s) at once (parallel LLM calls)",
         active=True,
-        simple="🚀 Starting test pipeline…",
+        simple=f"🚀 Starting pipeline — {parallel} parallel FR(s)",
     )
     append_status_log("Subprocess: python -m core.simple_run")
+    append_status_log(f"Parallel FR limit: {parallel}")
+
+    env = os.environ.copy()
+    env["MAX_PARALLEL_FRS"] = str(parallel)
 
     process = subprocess.Popen(
         [sys.executable, "-m", "core.simple_run"],
@@ -170,6 +176,7 @@ def _start_pipeline_subprocess():
         stderr=subprocess.PIPE,
         text=True,
         cwd=Path.cwd(),
+        env=env,
     )
     current_process["process"] = process
     current_process["type"] = "pipeline"
@@ -342,6 +349,8 @@ def clear_all_data():
         return "✅ All folders already empty"
 
 def top():
+    from config import MAX_PARALLEL_FRS
+
     # Header row with title and clear button
     with gr.Row():
         with gr.Column(scale=8):
@@ -377,8 +386,19 @@ def top():
                 processPdfButton = gr.Button("1. Process PDF", interactive=False)
                 runButton = gr.Button("2. Run", interactive=False)
                 stopButton = gr.Button("🛑 Stop", interactive=False, variant="stop", size="sm")
-            
-            # Add refresh button for real-time updates
+
+            parallelFrSlider = gr.Slider(
+                minimum=1,
+                maximum=99,
+                step=1,
+                value=MAX_PARALLEL_FRS,
+                label="Parallel FRs",
+                info=(
+                    "Max FRs running LLM steps at the same time. "
+                    "Cloud API: raise if your quota allows; local/Ollama: try 2–4."
+                ),
+            )
+
             refreshButton = gr.Button("🔄 Refresh Status & Results", variant="secondary")
 
         #########################
@@ -418,10 +438,11 @@ def top():
             detail,
         )
 
-    def complete_analysis():
+    def complete_analysis(max_parallel):
         """Create tasks JSON, run pipeline subprocess, yield status while running."""
         from core.status import set_app_status, get_status_ui
 
+        max_parallel = int(max_parallel)
         json_result, json_success = task_selector["create_tasks_json_file"]()
         snippet = load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True)
 
@@ -433,6 +454,7 @@ def top():
                 snippet,
                 gr.update(interactive=True),
                 gr.update(interactive=False),
+                gr.update(interactive=True),
             )
             return
 
@@ -451,10 +473,11 @@ def top():
             snippet,
             gr.update(interactive=False),
             gr.update(interactive=True),
+            gr.update(interactive=False),
         )
 
         try:
-            process = _start_pipeline_subprocess()
+            process = _start_pipeline_subprocess(max_parallel)
         except Exception as e:
             set_app_status(
                 "error",
@@ -471,6 +494,7 @@ def top():
                 snippet,
                 gr.update(interactive=True),
                 gr.update(interactive=False),
+                gr.update(interactive=True),
             )
             return
 
@@ -484,6 +508,7 @@ def top():
                 load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True),
                 gr.update(interactive=False),
                 gr.update(interactive=True),
+                gr.update(interactive=False),
             )
 
         success, final_status = _finish_pipeline_subprocess(process)
@@ -496,6 +521,7 @@ def top():
             snippet,
             gr.update(interactive=True),
             gr.update(interactive=False),
+            gr.update(interactive=True),
         )
 
     runButton.click(
@@ -504,8 +530,16 @@ def top():
         outputs=[runButton, stopButton, statusSimple, statusLog],
     ).then(
         fn=complete_analysis,
-        inputs=None,
-        outputs=[downloadButton, statusSimple, statusLog, resultSnippet, runButton, stopButton],
+        inputs=[parallelFrSlider],
+        outputs=[
+            downloadButton,
+            statusSimple,
+            statusLog,
+            resultSnippet,
+            runButton,
+            stopButton,
+            parallelFrSlider,
+        ],
         show_progress="full",
         show_progress_on=[statusSimple, statusLog, processPdfButton, runButton],
     )

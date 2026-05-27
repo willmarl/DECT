@@ -1,5 +1,4 @@
 import json
-import threading
 import time
 from typing import Any
 
@@ -7,10 +6,8 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from rich import print
 
-from config import MAX_PARALLEL_FRS
+from core.concurrency import llm_slot
 from llm_client import get_llm
-
-_llm_semaphore = threading.Semaphore(MAX_PARALLEL_FRS)
 
 # (input_data_key, template_placeholder_name in utils.prompts user_prompt)
 STEP_FORMAT_KEYS: dict[int, list[tuple[str, str]]] = {
@@ -55,7 +52,7 @@ def invoke_step(
     print(f"  Preparing prompt for step {step_number}...")
     start_time = time.time()
 
-    with _llm_semaphore:
+    with llm_slot():
         append_status_log(f"LLM step {step_number}: waiting for API slot")
         llm = get_llm()
 

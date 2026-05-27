@@ -182,7 +182,7 @@ flowchart TB
 
 ### Parallel FR processing
 
-Set `MAX_PARALLEL_FRS` in `.env` (default `3`). Each FR runs steps 1→8 in order; multiple FRs run at once up to that cap (LLM calls share a semaphore).
+Set parallel FR limit in the UI slider (1–99) before **Run**, or via `MAX_PARALLEL_FRS` in `.env` (default `3`, used as the slider’s initial value). Each FR runs steps 1→8 in order; multiple FRs run at once up to that cap (LLM calls share a semaphore).
 
 ---
 
