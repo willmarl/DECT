@@ -81,13 +81,12 @@ def get_summary_stats():
         return f"Error loading summary: {e}"
 
 def bot():
+    from config import UI_POLL_INTERVAL_SEC
+
     gr.Markdown("## Final Compiled Test Cases")
     
     # Summary statistics
     summary = gr.Markdown(get_summary_stats())
-    
-    # Refresh button to update the data
-    refresh_btn = gr.Button("🔄 Refresh Results", variant="secondary")
     
     # Full results dataframe
     full_results = gr.Dataframe(
@@ -97,14 +96,14 @@ def bot():
         interactive=False
     )
     
-    # Function to refresh both summary and dataframe
-    def refresh_all():
+    def poll_results():
         return get_summary_stats(), load_full_final_output()
-    
-    refresh_btn.click(
-        fn=refresh_all,
+
+    results_timer = gr.Timer(value=UI_POLL_INTERVAL_SEC)
+    results_timer.tick(
+        fn=poll_results,
         inputs=None,
-        outputs=[summary, full_results]
+        outputs=[summary, full_results],
     )
-    
-    return {"summary": summary, "dataframe": full_results, "refresh": refresh_btn}
+
+    return {"summary": summary, "dataframe": full_results}

@@ -349,7 +349,7 @@ def clear_all_data():
         return "✅ All folders already empty"
 
 def top():
-    from config import MAX_PARALLEL_FRS
+    from config import MAX_PARALLEL_FRS, UI_POLL_INTERVAL_SEC
 
     # Header row with title and clear button
     with gr.Row():
@@ -398,8 +398,6 @@ def top():
                     "Cloud API: raise if your quota allows; local/Ollama: try 2–4."
                 ),
             )
-
-            refreshButton = gr.Button("🔄 Refresh Status & Results", variant="secondary")
 
         #########################
         # Right Column Result Snippet
@@ -552,7 +550,6 @@ def top():
             gr.update(),
             gr.update(),
             gr.update(),
-            gr.update(),
         )
 
     def process_pdf_and_refresh(pdf_files):
@@ -623,7 +620,6 @@ def top():
             output_message,
             gr.update(interactive=has_files),
             gr.update(interactive=has_files),
-            gr.update(interactive=has_files),
             gr.update(value=title_text),
         )
 
@@ -637,7 +633,6 @@ def top():
             task_selector["file_dropdown"],
             task_selector["requirements_selector"],
             task_selector["selected_tasks_output"],
-            task_selector["refresh_btn"],
             task_selector["select_all_btn"],
             task_selector["deselect_all_btn"],
             task_selector["title_markdown"],
@@ -666,8 +661,8 @@ def top():
         outputs=[downloadFile]
     )
     
-    def refresh_status_and_results():
-        """Refresh status and results (manual button + timer)."""
+    def poll_status_and_results():
+        """Periodic refresh for status line, log, and result snippet."""
         simple, detail = get_status_outputs()
         return (
             simple,
@@ -675,17 +670,27 @@ def top():
             load_final_output_as_dataframe(limit_rows=5, truncate_for_snippet=True),
         )
 
-    refreshButton.click(
-        fn=refresh_status_and_results,
-        inputs=None,
-        outputs=[statusSimple, statusLog, resultSnippet],
-    )
+    def poll_status_tasks_and_results(current_file):
+        """Refresh status, results snippet, and task selector from disk."""
+        simple, detail, snippet = poll_status_and_results()
+        task_updates = task_selector["sync_task_files"](current_file)
+        return (simple, detail, snippet, *task_updates)
 
-    status_timer = gr.Timer(value=2)
+    status_timer = gr.Timer(value=UI_POLL_INTERVAL_SEC)
     status_timer.tick(
-        fn=refresh_status_and_results,
-        inputs=None,
-        outputs=[statusSimple, statusLog, resultSnippet],
+        fn=poll_status_tasks_and_results,
+        inputs=[task_selector["file_dropdown"]],
+        outputs=[
+            statusSimple,
+            statusLog,
+            resultSnippet,
+            task_selector["file_dropdown"],
+            task_selector["requirements_selector"],
+            task_selector["selected_tasks_output"],
+            task_selector["select_all_btn"],
+            task_selector["deselect_all_btn"],
+            task_selector["title_markdown"],
+        ],
     )
     
     # Clear button functionality - resets everything to initial state

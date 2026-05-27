@@ -171,6 +171,8 @@ def get_fr_summary(fr_id: str) -> str:
     return f"📋 **{fr_id}** | Completed Steps: {completed_steps}/8 | Progress: {completed_steps/8*100:.0f}%"
 
 def mid():
+    from config import UI_POLL_INTERVAL_SEC
+
     # Load available FRs
     available_frs = get_available_frs()
     initial_fr = available_frs[0] if available_frs else "No FRs available"
@@ -192,8 +194,6 @@ def mid():
             """
         )
         
-        refreshFrButton = gr.Button("🔄 Refresh FRs", variant="secondary")
-    
     # FR Summary
     frSummary = gr.Markdown(get_fr_summary(initial_fr))
     
@@ -279,16 +279,16 @@ def mid():
         
         return results
     
-    # Function to refresh FR list
-    def refresh_fr_list():
-        """Refresh the list of available FRs"""
+    def poll_fr_view(selected_fr):
+        """Periodic refresh: update FR list and step data; keep current FR if still valid."""
         new_frs = get_available_frs()
-        new_initial = new_frs[0] if new_frs else "No FRs available"
-        
-        # Return updated dropdown and all step data for the new initial FR
-        update_results = update_all_steps(new_initial)
-        return [gr.update(choices=new_frs, value=new_initial)] + update_results
-    
+        if selected_fr in new_frs:
+            current = selected_fr
+        else:
+            current = new_frs[0] if new_frs else "No FRs available"
+        update_results = update_all_steps(current)
+        return [gr.update(choices=new_frs, value=current)] + update_results
+
     # Connect FR selection to update all steps
     selectFr.change(
         fn=update_all_steps,
@@ -306,10 +306,10 @@ def mid():
         ]
     )
     
-    # Connect refresh button
-    refreshFrButton.click(
-        fn=refresh_fr_list,
-        inputs=None,
+    fr_timer = gr.Timer(value=UI_POLL_INTERVAL_SEC)
+    fr_timer.tick(
+        fn=poll_fr_view,
+        inputs=[selectFr],
         outputs=[
             selectFr, frSummary,
             step1_df, step1_status,
@@ -319,8 +319,8 @@ def mid():
             step5_df, step5_status,
             step6_df, step6_status,
             step7_df, step7_status,
-            step8_df, step8_status
-        ]
+            step8_df, step8_status,
+        ],
     )
-    
+
     gr.Markdown("---")

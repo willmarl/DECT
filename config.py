@@ -21,3 +21,6 @@ OLLAMA_HOST = os.getenv("OLLAMA_HOST", "")
 
 # Max concurrent LLM calls when processing multiple FRs in parallel
 MAX_PARALLEL_FRS = max(1, int(os.getenv("MAX_PARALLEL_FRS", "3")))
+
+# Gradio UI auto-refresh interval (status, task list, step viewer, results)
+UI_POLL_INTERVAL_SEC = max(1, int(os.getenv("UI_POLL_INTERVAL_SEC", "3")))

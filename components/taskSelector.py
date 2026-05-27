@@ -204,41 +204,51 @@ def create_task_selector():
         """Deselect all requirements"""
         return gr.update(value=[])
     
-    def refresh_files():
-        """Refresh the JSON files and update dropdown"""
-        nonlocal all_selections
-        all_selections = {}  # Clear all selections when refreshing
-        file_options = selector.refresh_json_files()
-        initial_file = file_options[0] if file_options else None
-        
-        # Check if directory is empty
+    def _task_selector_ui_state(selected_file):
+        """Build dropdown/requirements/title updates from current disk state."""
         is_empty = selector.is_directory_empty()
         has_files = selector.has_files()
-        
-        # Also clear the requirements when refreshing
-        initial_requirements = []
-        if initial_file:
-            initial_requirements, _ = selector.get_requirements_for_file(initial_file)
-        
+        file_options = selector.get_file_options()
+
+        if selected_file and selected_file in file_options:
+            active_file = selected_file
+        else:
+            active_file = file_options[0] if file_options else None
+
+        requirements = []
+        if active_file:
+            requirements, _ = selector.get_requirements_for_file(active_file)
+
+        preserved = all_selections.get(active_file, []) if active_file else []
+        preserved = [r for r in preserved if r in requirements]
+
         if is_empty:
-            output_message = "📂 No processed PDFs found.\n\nPlease upload and process a PDF first using the '1. Process PDF' button above."
             title_text = "### 📋 Task Selector ⚠️ (Disabled - No PDFs Processed)"
         elif not has_files:
-            output_message = "⚠️ No valid task files found.\n\nThe extractedFR folder exists but contains no valid JSON files."
             title_text = "### 📋 Task Selector ⚠️ (Disabled - No Valid Files)"
         else:
-            output_message = "No tasks selected"
             title_text = "### 📋 Task Selector"
-        
+
+        output_message = selector.format_all_selected_requirements(all_selections)
+        if is_empty:
+            output_message = (
+                "📂 No processed PDFs found.\n\n"
+                "Please upload and process a PDF first using the '1. Process PDF' button above."
+            )
+
         return [
-            gr.update(choices=file_options, value=initial_file, interactive=has_files),  # Update dropdown
-            gr.update(choices=initial_requirements, value=[], interactive=has_files),   # Update requirements
-            output_message,  # Update output message
-            gr.update(interactive=has_files),  # Refresh button
-            gr.update(interactive=has_files),  # Select all button  
-            gr.update(interactive=has_files),  # Deselect all button
-            gr.update(value=title_text),  # Update title
+            gr.update(choices=file_options, value=active_file, interactive=has_files),
+            gr.update(choices=requirements, value=preserved, interactive=has_files),
+            output_message,
+            gr.update(interactive=has_files),
+            gr.update(interactive=has_files),
+            gr.update(value=title_text),
         ]
+
+    def sync_task_files(current_file):
+        """Reload JSON from disk; keep selections when possible (used by UI timer)."""
+        selector.load_json_files()
+        return _task_selector_ui_state(current_file)
     
     def update_selections_and_output(selected_file, selected_requirements):
         """Update the stored selections and output display"""
@@ -301,9 +311,6 @@ def create_task_selector():
     
     with gr.Row():
         with gr.Column(scale=3):
-            # Refresh button to reload JSON files after PDF processing
-            refresh_btn = gr.Button("🔄 Refresh Tasks", size="sm", interactive=has_files)
-            
             # File selector dropdown
             file_dropdown = gr.Dropdown(
                 choices=file_options,
@@ -338,11 +345,6 @@ def create_task_selector():
     selection_status = gr.Textbox(value="False", visible=False)
     
     # Event handlers
-    refresh_btn.click(
-        fn=refresh_files,
-        outputs=[file_dropdown, requirements_selector, selected_tasks_output, refresh_btn, select_all_btn, deselect_all_btn, title_markdown]
-    )
-    
     file_dropdown.change(
         fn=update_requirements_list,
         inputs=[file_dropdown],
@@ -368,8 +370,8 @@ def create_task_selector():
     )
     
     return {
-        'refresh_btn': refresh_btn,
         'file_dropdown': file_dropdown,
+        'sync_task_files': sync_task_files,
         'requirements_selector': requirements_selector,
         'select_all_btn': select_all_btn,
         'deselect_all_btn': deselect_all_btn,
