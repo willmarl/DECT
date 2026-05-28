@@ -32,6 +32,22 @@ def pdf_to_images(pdf_bytes):
     return success
 
 
+def _abort_pdf_if_cancelled():
+    """If user requested stop, update status and signal completion to the UI loop."""
+    from core.status import get_status_ui, is_pdf_cancel_requested, set_app_status
+
+    if not is_pdf_cancel_requested():
+        return False
+    set_app_status(
+        "idle",
+        "PDF processing stopped",
+        "Stopped by user",
+        active=False,
+        simple="🛑 Stopped",
+    )
+    return True
+
+
 def pdf_to_images_with_progress(pdf_bytes):
     """
     Yield (simple_status, detail_log, is_complete) while processing PDFs.
@@ -67,6 +83,9 @@ def pdf_to_images_with_progress(pdf_bytes):
         simple="🗑️ Preparing files…",
     )
     yield *_format_pdf_status(), False
+    if _abort_pdf_if_cancelled():
+        yield *_format_pdf_status(), True
+        return
     fresh_pdf_folders()
 
     file_list = []
@@ -75,6 +94,9 @@ def pdf_to_images_with_progress(pdf_bytes):
 
     total_pdfs = len(file_list)
     for i, file_name in enumerate(file_list):
+        if _abort_pdf_if_cancelled():
+            yield *_format_pdf_status(), True
+            return
         set_app_status(
             "pdf",
             f"Converting PDF to images ({i + 1}/{total_pdfs})",
@@ -88,6 +110,9 @@ def pdf_to_images_with_progress(pdf_bytes):
             file_bytes = file.read()
 
         images = convert_from_bytes(file_bytes, dpi=300)
+        if _abort_pdf_if_cancelled():
+            yield *_format_pdf_status(), True
+            return
         page_count = len(images)
 
         for j, img in enumerate(images):
@@ -100,6 +125,9 @@ def pdf_to_images_with_progress(pdf_bytes):
             if j == 0 or j == page_count - 1 or j % max(1, page_count // 4) == 0:
                 yield *_format_pdf_status(), False
             img.save(f"{input_folder_name}/{file_name}/{j + 1}.png", "PNG")
+            if _abort_pdf_if_cancelled():
+                yield *_format_pdf_status(), True
+                return
 
     set_app_status(
         "pdf",
@@ -112,6 +140,9 @@ def pdf_to_images_with_progress(pdf_bytes):
     from utils.extractFR import extract_fr_from_images_with_progress
 
     for msg, done in extract_fr_from_images_with_progress():
+        if _abort_pdf_if_cancelled():
+            yield *_format_pdf_status(), True
+            return
         if "Vision LLM" in msg or "LLM" in msg:
             simple = f"🤖 {msg}"
         elif "Saved" in msg:

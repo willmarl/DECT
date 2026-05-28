@@ -42,6 +42,11 @@ def extract_fr_from_images_with_progress():
     total = len(folders)
 
     for idx, pdf_folder in enumerate(folders, 1):
+        from core.status import is_pdf_cancel_requested
+
+        if is_pdf_cancel_requested():
+            yield "PDF processing stopped by user", True
+            return
         append_status_log(f"Reading images for {pdf_folder.name} ({idx}/{total})")
         yield f"Reading images for {pdf_folder.name} ({idx}/{total})", False
 
@@ -70,6 +75,10 @@ def extract_fr_from_images_with_progress():
             f"Vision LLM parsing {pdf_folder.name} ({len(images)} pages)...",
             False,
         )
+
+        if is_pdf_cancel_requested():
+            yield "PDF processing stopped by user", True
+            return
 
         messages = [
             SystemMessage(content=SYSTEM_PROMPT),

@@ -13,13 +13,19 @@ APP_CSS = """
 .gradio-container .markdown p { margin: 0.2rem 0 !important; }
 """ + GRADIO_DF_CSS
 
-with gr.Blocks(css=APP_CSS) as demo:
+with gr.Blocks() as demo:
     top()
     mid()
     bot()
 
 fastapi_app = FastAPI()
-app = gr.mount_gradio_app(app=fastapi_app, blocks=demo, path="/")
+app = gr.mount_gradio_app(
+    app=fastapi_app,
+    blocks=demo,
+    path="/",
+    allowed_paths=["outputs"],
+    css=APP_CSS,
+)
 
 # if __name__ == "__main__":
 #     demo.launch(quiet=False)

@@ -1,9 +1,13 @@
 import json
 import re
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 from core.io import pdf_stem
+
+_pdf_cancel_event = threading.Event()
+_pdf_processing_active = False
 
 APP_STATUS_FILE = Path("data/app_status.json")
 PIPELINE_STATUS_FILE = Path("pipeline_status.txt")
@@ -235,6 +239,36 @@ def note_files_uploaded(filenames: list[str]) -> None:
         active=False,
         simple=simple,
     )
+
+
+def begin_pdf_processing() -> None:
+    """Mark PDF processing as active and clear any prior cancel request."""
+    global _pdf_processing_active
+    _pdf_cancel_event.clear()
+    _pdf_processing_active = True
+
+
+def end_pdf_processing() -> None:
+    """Clear PDF processing / cancel state."""
+    global _pdf_processing_active
+    _pdf_cancel_event.clear()
+    _pdf_processing_active = False
+
+
+def request_pdf_cancel() -> bool:
+    """Request cooperative stop of in-thread PDF processing. Returns True if PDF was active."""
+    if not _pdf_processing_active:
+        return False
+    _pdf_cancel_event.set()
+    return True
+
+
+def is_pdf_cancel_requested() -> bool:
+    return _pdf_cancel_event.is_set()
+
+
+def is_pdf_processing_active() -> bool:
+    return _pdf_processing_active
 
 
 def clear_app_status(
